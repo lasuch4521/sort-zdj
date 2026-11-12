@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#121212">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>FotoSort</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        :root {
+            --bg-main: #121212;
+            --bg-card: #1E1E1E;
+            --bg-elevated: #2A2A2A;
+            --accent: #3B82F6;
+            --accent-hover: #2563EB;
+            --danger: #EF4444;
+            --text-main: #F3F4F6;
+            --text-muted: #9CA3AF;
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* GÓRNY PASEK (z uwzględnieniem paska statusu telefonu) */
+        header {
+            background-color: var(--bg-card);
+            padding: calc(12px + var(--safe-top)) 16px 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #2E2E2E;
+            z-index: 10;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--text-main);
+            font-size: 22px;
+            cursor: pointer;
+            display: none;
+            padding: 4px 8px;
+        }
+
+        h1 {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .install-btn {
+            background-color: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            display: none;
+            cursor: pointer;
+        }
+
+        /* GŁÓWNA PRZESTRZEŃ ROBOCZA */
+        main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            padding-bottom: 100px;
+        }
+
+        .search-bar {
+            width: 100%;
+            background-color: var(--bg-card);
+            border: 1px solid #333;
+            color: var(--text-main);
+            padding: 12px 14px;
+            border-radius: 12px;
+            font-size: 15px;
+            margin-bottom: 16px;
+            outline: none;
+        }
+
+        .search-bar:focus {
+            border-color: var(--accent);
+        }
+
+        /* SIATKA FOLDERÓW */
+        .folders-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px;
+        }
+
+        .folder-card {
+            background-color: var(--bg-card);
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 135px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #2A2A2A;
+            cursor: pointer;
+            transition: transform 0.15s;
+        }
+
+        .folder-card:active {
+            transform: scale(0.97);
+        }
+
+        .folder-icon {
+            font-size: 28px;
+            z-index: 2;
+        }
+
+        .folder-info {
+            z-index: 2;
+        }
+
+        .folder-name {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .folder-count {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .folder-delete {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            font-size: 14px;
+            z-index: 3;
+            cursor: pointer;
+        }
+
+        /* SIATKA ZDJĘĆ */
+        .photos-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .photo-card {
+            aspect-ratio: 1;
+            background-color: var(--bg-card);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .photo-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .photo-note-badge {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            font-size: 10px;
+            padding: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .photo-select-checkbox {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 22px;
+            height: 22px;
+            accent-color: var(--accent);
+            display: none;
+        }
+
+        .selection-mode .photo-select-checkbox {
+            display: block;
+        }
+
+        /* PASEK AKCJI MASOWYCH */
+        .bulk-bar {
+            display: none;
+            background-color: var(--bg-elevated);
+            padding: 10px 16px;
+            border-radius: 12px;
+            margin-bottom: 14px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .bulk-bar.active {
+            display: flex;
+        }
+
+        .btn-small {
+            background-color: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+        }
+
+        /* DOLNY PASEK NAWIGACJI (Uwzględnia pasek systemowy telefonu) */
+        nav.bottom-nav {
+            background-color: var(--bg-card);
+            border-top: 1px solid #2E2E2E;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding-top: 8px;
+            padding-bottom: calc(10px + var(--safe-bottom));
+            z-index: 20;
+        }
+
+        .nav-item {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .nav-item.active {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .nav-item span.icon {
+            font-size: 22px;
+        }
+
+        .nav-camera-btn {
+            background-color: var(--accent);
+            color: #fff;
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            border: 4px solid var(--bg-main);
+            transform: translateY(-14px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            cursor: pointer;
+        }
+
+        /* MODALE I PODGLĄD ZDJĘCIA */
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: var(--bg-card);
+            width: 100%;
+            max-width: 380px;
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .modal-content input, .modal-content select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid #333;
+            background-color: var(--bg-elevated);
+            color: var(--text-main);
+            font-size: 15px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        /* PEŁNY EKRAN ZDJĘCIA */
+        .viewer-modal {
+            flex-direction: column;
+            justify-content: space-between;
+            padding: calc(16px + var(--safe-top)) 16px calc(16px + var(--safe-bottom)) 16px;
+        }
+
+        .viewer-img-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        .viewer-img-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+
+        .viewer-controls {
+            width: 100%;
+            background: var(--bg-card);
+            padding: 12px;
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .viewer-buttons {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--text-muted);
+            margin-top: 60px;
+            font-size: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- GÓRNY PASEK -->
+    <header>
+        <div class="header-left">
+            <button class="back-btn" id="backBtn" onclick="showFoldersView()">←</button>
+            <h1 id="headerTitle">FotoSort</h1>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <button class="btn-small" id="selectModeBtn" style="display:none; background:#333;" onclick="toggleSelectionMode()">Zaznacz</button>
+            <button class="install-btn" id="installBtn">Pobierz apkę</button>
+        </div>
+    </header>
+
+    <!-- GŁÓWNY EKRAN -->
+    <main id="mainContainer">
+        <input type="text" class="search-bar" id="searchInput" placeholder="Szukaj po nazwie lub notatce..." oninput="handleSearch()">
+
+        <!-- Pasek akcji przy zaznaczaniu wielu zdjęć -->
+        <div class="bulk-bar" id="bulkBar">
+            <span id="selectedCount">Zaznaczono: 0</span>
+            <div style="display:flex; gap: 8px;">
+                <button class="btn-small" onclick="openMoveModal()">Przenieś</button>
+                <button class="btn-small btn-danger" onclick="deleteSelectedPhotos()">Usuń</button>
+            </div>
+        </div>
+
+        <!-- Widok: Siatka folderów -->
+        <div id="foldersView" class="folders-grid"></div>
+
+        <!-- Widok: Siatka zdjęć w folderze -->
+        <div id="photosView" style="display: none;">
+            <div id="photosGrid" class="photos-grid"></div>
+        </div>
+    </main>
+
+    <!-- DOLNY PASEK NAWIGACJI -->
+    <nav class="bottom-nav">
+        <button class="nav-item active" id="navFolders" onclick="showFoldersView()">
+            <span class="icon">📁</span>
+            <span>Foldery</span>
+        </button>
+        <button class="nav-item" id="navUnsorted" onclick="openFolder('unsorted')">
+            <span class="icon">📥</span>
+            <span>Poczekalnia</span>
+        </button>
+        <button class="nav-camera-btn" onclick="triggerCamera()">📷</button>
+        <button class="nav-item" onclick="triggerGallery()">
+            <span class="icon">🖼️</span>
+            <span>Z galerii</span>
+        </button>
+        <button class="nav-item" onclick="openNewFolderModal()">
+            <span class="icon">➕</span>
+            <span>Nowy folder</span>
+        </button>
+    </nav>
+
+    <!-- Ukryte inputy do aparatu i galerii -->
+    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleFiles(this.files)">
+    <input type="file" id="galleryInput" accept="image/*" multiple style="display:none" onchange="handleFiles(this.files)">
+
+    <!-- MODAL: Nowy Folder -->
+    <div class="modal" id="newFolderModal">
+        <div class="modal-content">
+            <h3>Nowy folder</h3>
+            <input type="text" id="folderNameInput" placeholder="Nazwa folderu (np. Niemiecki)">
+            <select id="folderIconInput">
+                <option value="📚">📚 Książki / Szkoła</option>
+                <option value="📐">📐 Matematyka / Technika</option>
+                <option value="⚙️">⚙️ Zawodowe / PLC</option>
+                <option value="🚗">🚗 Motoryzacja</option>
+                <option value="🃏">🃏 Kolekcje / Karty</option>
+                <option value="📌">📌 Inne</option>
+            </select>
+            <div class="modal-actions">
+                <button class="btn-small" style="background:#444;" onclick="closeModals()">Anuluj</button>
+                <button class="btn-small" onclick="createFolder()">Utwórz</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Przenoszenie zdjęć -->
+    <div class="modal" id="moveModal">
+        <div class="modal-content">
+            <h3>Przenieś do folderu</h3>
+            <select id="moveTargetSelect"></select>
+            <div class="modal-actions">
+                <button class="btn-small" style="background:#444;" onclick="closeModals()">Anuluj</button>
+                <button class="btn-small" onclick="confirmMovePhotos()">Przenieś</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Podgląd zdjęcia -->
+    <div class="modal viewer-modal" id="photoViewerModal">
+        <div style="width:100%; display:flex; justify-content:space-between;">
+            <button class="btn-small" style="background:#333;" onclick="closeModals()">✕ Zamknij</button>
+            <button class="btn-small" onclick="downloadCurrentPhoto()">⬇️ Pobierz</button>
+        </div>
+        <div class="viewer-img-container">
+            <img id="viewerImg" src="" alt="Podgląd">
+        </div>
+        <div class="viewer-controls">
+            <input type="text" id="photoNoteInput" placeholder="Dodaj notatkę (np. Zadanie 4 na piątek)..." onchange="savePhotoNote()">
+            <div class="viewer-buttons">
+                <button class="btn-small" onclick="openSingleMoveModal()">📁 Przenieś</button>
+                <button class="btn-small btn-danger" onclick="deleteCurrentPhoto()">🗑️ Usuń zdjęcie</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- BAZA DANYCH INDEXEDDB ---
+        let db;
+        let currentFolderId = null;
+        let currentPhotoId = null;
+        let selectionMode = false;
+        let selectedPhotoIds = new Set();
+
+        const defaultFolders = [
+            { id: 'unsorted', name: 'Do posortowania', icon: '📥', system: true },
+            { id: 'math', name: 'Matematyka i Fizyka', icon: '📐', system: false },
+            { id: 'tech', name: 'Przedmioty zawodowe', icon: '⚙️', system: false },
+            { id: 'human', name: 'Polski i Historia', icon: '📚', system: false },
+            { id: 'auto', name: 'Motoryzacja / Garaż', icon: '🚗', system: false },
+            { id: 'other', name: 'Prywatne / Inne', icon: '📌', system: false }
+        ];
+
+        const request = indexedDB.open("FotoSortDB", 1);
+
+        request.onupgradeneeded = (e) => {
+            db = e.target.result;
+            const folderStore = db.createObjectStore("folders", { keyPath: "id" });
+            const photoStore = db.createObjectStore("photos", { keyPath: "id" });
+            photoStore.createIndex("folderId", "folderId", { unique: false });
+
+            defaultFolders.forEach(f => folderStore.add(f));
+        };
+
+        request.onsuccess = (e) => {
+            db = e.target.result;
+            renderFolders();
+        };
+
+        // --- RENDEROWANIE FOLDERÓW ---
+        function renderFolders(filter = "") {
+            const tx = db.transaction(["folders", "photos"], "readonly");
+            const folderStore = tx.objectStore("folders");
+            const photoStore = tx.objectStore("photos");
+
+            folderStore.getAll().onsuccess = (e) => {
+                const folders = e.target.result;
+                photoStore.getAll().onsuccess = (pe) => {
+                    const photos = pe.target.result;
+                    const grid = document.getElementById("foldersView");
+                    grid.innerHTML = "";
+
+                    folders
+                        .filter(f => f.name.toLowerCase().includes(filter.toLowerCase()))
+                        .forEach(folder => {
+                            const count = photos.filter(p => p.folderId === folder.id).length;
+                            const card = document.createElement("div");
+                            card.className = "folder-card";
+                            card.onclick = () => openFolder(folder.id, folder.name);
+
+                            card.innerHTML = `
+                                <div class="folder-icon">${folder.icon}</div>
+                                ${!folder.system ? `<button class="folder-delete" onclick="deleteFolder(event, '${folder.id}')">✕</button>` : ''}
+                                <div class="folder-info">
+                                    <div class="folder-name">${folder.name}</div>
+                                    <div class="folder-count">${count} zdjęć</div>
+                                </div>
+                            `;
+                            grid.appendChild(card);
+                        });
+                };
+            };
+        }
+
+        // --- OTWIERANIE FOLDERU I ZDJĘĆ ---
+        function openFolder(folderId, folderName = null) {
+            currentFolderId = folderId;
+            selectionMode = false;
+            selectedPhotoIds.clear();
+            updateBulkBar();
+
+            document.getElementById("foldersView").style.display = "none";
+            document.getElementById("photosView").style.display = "block";
+            document.getElementById("backBtn").style.display = "block";
+            document.getElementById("selectModeBtn").style.display = "block";
+
+            document.getElementById("navFolders").classList.remove("active");
+            document.getElementById("navUnsorted").classList.toggle("active", folderId === 'unsorted');
+
+            if (!folderName) {
+                const tx = db.transaction("folders", "readonly");
+                tx.objectStore("folders").get(folderId).onsuccess = (e) => {
+                    document.getElementById("headerTitle").innerText = e.target.result ? e.target.result.name : "Folder";
+                };
+            } else {
+                document.getElementById("headerTitle").innerText = folderName;
+            }
+
+            renderPhotos();
+        }
+
+        function showFoldersView() {
+            currentFolderId = null;
+            selectionMode = false;
+            selectedPhotoIds.clear();
+            updateBulkBar();
+
+            document.getElementById("foldersView").style.display = "grid";
+            document.getElementById("photosView").style.display = "none";
+            document.getElementById("backBtn").style.display = "none";
+            document.getElementById("selectModeBtn").style.display = "none";
+            document.getElementById("headerTitle").innerText = "FotoSort";
+
+            document.getElementById("navFolders").classList.add("active");
+            document.getElementById("navUnsorted").classList.remove("active");
+
+            renderFolders(document.getElementById("searchInput").value);
+        }
+
+        function renderPhotos(filter = "") {
+            const grid = document.getElementById("photosGrid");
+            grid.innerHTML = "";
+            grid.className = selectionMode ? "photos-grid selection-mode" : "photos-grid";
+
+            const tx = db.transaction("photos", "readonly");
+            const index = tx.objectStore("photos").index("folderId");
+
+            index.getAll(currentFolderId).onsuccess = (e) => {
+                let photos = e.target.result.sort((a, b) => b.createdAt - a.createdAt);
+                if (filter) {
+                    photos = photos.filter(p => (p.note || "").toLowerCase().includes(filter.toLowerCase()));
+                }
+
+                if (photos.length === 0) {
+                    grid.innerHTML = `<div class="empty-state" style="grid-column: 1/-1;">Brak zdjęć w tym folderze. Kliknij 📷 na dole, aby dodać!</div>`;
+                    return;
+                }
+
+                photos.forEach(photo => {
+                    const card = document.createElement("div");
+                    card.className = "photo-card";
+                    card.onclick = () => handlePhotoClick(photo);
+
+                    card.innerHTML = `
+                        <img src="${photo.dataUrl}" loading="lazy">
+                        <input type="checkbox" class="photo-select-checkbox" ${selectedPhotoIds.has(photo.id) ? 'checked' : ''}>
+                        ${photo.note ? `<div class="photo-note-badge">${photo.note}</div>` : ''}
+                    `;
+                    grid.appendChild(card);
+                });
+            };
+        }
+
+        // --- DODAWANIE ZDJĘĆ ---
+        function triggerCamera() {
+            document.getElementById("cameraInput").click();
+        }
+
+        function triggerGallery() {
+            document.getElementById("galleryInput").click();
+        }
+
+        function handleFiles(files) {
+            if (!files.length) return;
+            const targetFolder = currentFolderId || 'unsorted';
+
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const photo = {
+                        id: 'img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                        folderId: targetFolder,
+                        dataUrl: e.target.result,
+                        note: "",
+                        createdAt: Date.now()
+                    };
+                    const tx = db.transaction("photos", "readwrite");
+                    tx.objectStore("photos").add(photo);
+                    tx.oncomplete = () => {
+                        if (currentFolderId) renderPhotos();
+                        else renderFolders();
+                    };
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // --- ZARZĄDZANIE FOLDERAMI ---
+        function openNewFolderModal() {
+            document.getElementById("folderNameInput").value = "";
+            document.getElementById("newFolderModal").classList.add("active");
+        }
+
+        function createFolder() {
+            const name = document.getElementById("folderNameInput").value.trim();
+            const icon = document.getElementById("folderIconInput").value;
+            if (!name) return;
+
+            const newFolder = {
+                id: 'fld_' + Date.now(),
+                name,
+                icon,
+                system: false
+            };
+
+            const tx = db.transaction("folders", "readwrite");
+            tx.objectStore("folders").add(newFolder);
+            tx.oncomplete = () => {
+                closeModals();
+                renderFolders();
+            };
+        }
+
+        function deleteFolder(e, folderId) {
+            e.stopPropagation();
+            if (!confirm("Usunąć ten folder i wszystkie zdjęcia w środku?")) return;
+
+            const tx = db.transaction(["folders", "photos"], "readwrite");
+            tx.objectStore("folders").delete(folderId);
+
+            const photoStore = tx.objectStore("photos");
+            const index = photoStore.index("folderId");
+            index.getAllKeys(folderId).onsuccess = (ev) => {
+                ev.target.result.forEach(key => photoStore.delete(key));
+            };
+
+            tx.oncomplete = () => renderFolders();
+        }
+
+        // --- PODGLĄD I ZAZNACZANIE ZDJĘĆ ---
+        function handlePhotoClick(photo) {
+            if (selectionMode) {
+                if (selectedPhotoIds.has(photo.id)) selectedPhotoIds.delete(photo.id);
+                else selectedPhotoIds.add(photo.id);
+                updateBulkBar();
+                renderPhotos(document.getElementById("searchInput").value);
+            } else {
+                currentPhotoId = photo.id;
+                document.getElementById("viewerImg").src = photo.dataUrl;
+                document.getElementById("photoNoteInput").value = photo.note || "";
+                document.getElementById("photoViewerModal").classList.add("active");
+            }
+        }
+
+        function savePhotoNote() {
+            if (!currentPhotoId) return;
+            const note = document.getElementById("photoNoteInput").value.trim();
+            const tx = db.transaction("photos", "readwrite");
+            const store = tx.objectStore("photos");
+            store.get(currentPhotoId).onsuccess = (e) => {
+                const photo = e.target.result;
+                photo.note = note;
+                store.put(photo);
+                tx.oncomplete = () => renderPhotos();
+            };
+        }
+
+        function deleteCurrentPhoto() {
+            if (!confirm("Usunąć to zdjęcie?")) return;
+            const tx = db.transaction("photos", "readwrite");
+            tx.objectStore("photos").delete(currentPhotoId);
+            tx.oncomplete = () => {
+                closeModals();
+                renderPhotos();
+            };
+        }
+
+        function downloadCurrentPhoto() {
+            const src = document.getElementById("viewerImg").src;
+            const a = document.createElement("a");
+            a.href = src;
+            a.download = `FotoSort_${Date.now()}.jpg`;
+            a.click();
+        }
+
+        // --- MASOWE OPERACJE ---
+        function toggleSelectionMode() {
+            selectionMode = !selectionMode;
+            selectedPhotoIds.clear();
+            updateBulkBar();
+            renderPhotos();
+        }
+
+        function updateBulkBar() {
+            const bar = document.getElementById("bulkBar");
+            bar.classList.toggle("active", selectionMode);
+            document.getElementById("selectedCount").innerText = `Zaznaczono: ${selectedPhotoIds.size}`;
+        }
+
+        function openMoveModal() {
+            if (selectedPhotoIds.size === 0) return;
+            populateMoveSelect();
+            document.getElementById("moveModal").classList.add("active");
+        }
+
+        function openSingleMoveModal() {
+            selectedPhotoIds.clear();
+            selectedPhotoIds.add(currentPhotoId);
+            populateMoveSelect();
+            document.getElementById("moveModal").classList.add("active");
+        }
+
+        function populateMoveSelect() {
+            const select = document.getElementById("moveTargetSelect");
+            select.innerHTML = "";
+            db.transaction("folders", "readonly").objectStore("folders").getAll().onsuccess = (e) => {
+                e.target.result.forEach(f => {
+                    const opt = document.createElement("option");
+                    opt.value = f.id;
+                    opt.innerText = `${f.icon} ${f.name}`;
+                    select.appendChild(opt);
+                });
+            };
+        }
+
+        function confirmMovePhotos() {
+            const targetFolderId = document.getElementById("moveTargetSelect").value;
+            const tx = db.transaction("photos", "readwrite");
+            const store = tx.objectStore("photos");
+
+            selectedPhotoIds.forEach(id => {
+                store.get(id).onsuccess = (e) => {
+                    const photo = e.target.result;
+                    if (photo) {
+                        photo.folderId = targetFolderId;
+                        store.put(photo);
+                    }
+                };
+            });
+
+            tx.oncomplete = () => {
+                selectedPhotoIds.clear();
+                selectionMode = false;
+                updateBulkBar();
+                closeModals();
+                renderPhotos();
+            };
+        }
+
+        function deleteSelectedPhotos() {
+            if (!selectedPhotoIds.size || !confirm(`Usunąć zaznaczone zdjęcia (${selectedPhotoIds.size})?`)) return;
+            const tx = db.transaction("photos", "readwrite");
+            const store = tx.objectStore("photos");
+            selectedPhotoIds.forEach(id => store.delete(id));
+            tx.oncomplete = () => {
+                selectedPhotoIds.clear();
+                selectionMode = false;
+                updateBulkBar();
+                renderPhotos();
+            };
+        }
+
+        function handleSearch() {
+            const q = document.getElementById("searchInput").value;
+            if (currentFolderId) renderPhotos(q);
+            else renderFolders(q);
+        }
+
+        function closeModals() {
+            document.querySelectorAll(".modal").forEach(m => m.classList.remove("active"));
+        }
+
+        // --- OBSŁUGA INSTALACJI PWA NA TELEFONIE ---
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+
+        let deferredPrompt;
+        const installBtn = document.getElementById('installBtn');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.style.display = 'block';
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') installBtn.style.display = 'none';
+            deferredPrompt = null;
+        });
+    </script>
+</body>
+</html>
